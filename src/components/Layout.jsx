@@ -15,7 +15,7 @@ const NAV = [
   { to: '/', label: 'Tableau de bord', icon: LayoutDashboard, end: true },
   { to: '/generateur', label: "Générateur d'idées", icon: Sparkles },
   { to: '/journee', label: 'Planning journée', icon: CalendarDays },
-  { to: '/semaine', label: 'Planning semaine', icon: CalendarRange },
+  { to: '/mois', label: 'Planning juillet', icon: CalendarRange },
   { to: '/bibliotheque', label: "Bibliothèque", icon: Library },
   { to: '/projets', label: 'Mes projets', icon: FolderKanban },
 ];

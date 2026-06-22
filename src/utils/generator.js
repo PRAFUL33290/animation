@@ -2,10 +2,16 @@
  * Générateur d'idées "IA simulée".
  *
  * Combine les modèles de la banque d'activités avec le thème et les contraintes
- * saisies par l'utilisateur. L'API publique (generateIdeas / generateWeek /
- * generateProject) est asynchrone afin de pouvoir, plus tard, remplacer
- * l'implémentation locale par un appel à une vraie API IA sans changer les
- * composants appelants.
+ * saisies par l'utilisateur. L'API publique est asynchrone afin de pouvoir,
+ * plus tard, remplacer l'implémentation locale par un appel à une vraie API IA
+ * sans changer les composants appelants.
+ *
+ * Règles métier importantes :
+ *  - Le thème est saisi librement (c'est l'équipe qui le choisit). Un thème
+ *    inconnu de la banque est tout de même exploité (flavor générique).
+ *  - Dans le planning, le thème ne s'applique QU'AUX activités du matin.
+ *    Les autres créneaux (temps libre, temps calme, activité de l'après-midi)
+ *    restent neutres / libres.
  */
 import {
   ACTIVITY_TEMPLATES,
@@ -13,12 +19,47 @@ import {
   DEFAULT_FLAVOR,
   CATEGORIES,
 } from '../data/activitiesBank.js';
-import { findTheme, findLabel, THEMES } from '../data/themes.js';
-import { WEEK_DAYS } from '../data/timeSlots.js';
+import { findLabel, THEMES } from '../data/themes.js';
 import { uid } from './id.js';
 
-function getFlavor(themeId) {
-  return THEME_FLAVOR[themeId] || DEFAULT_FLAVOR;
+const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Flavor neutre pour les activités SANS thème (après-midi, temps libre/calme).
+const NEUTRAL_FLAVOR = {
+  univers: 'des activités du centre',
+  perso: 'les enfants',
+  lieu: 'la salle',
+  mot: 'du jour',
+};
+
+/**
+ * Résout un thème saisi librement vers une "flavor" exploitable.
+ * Accepte : un id connu ('oceans'), un libellé connu ('Océans'), ou un texte
+ * totalement libre ('Le cirque enchanté').
+ */
+export function resolveFlavor(theme) {
+  if (!theme) return { ...DEFAULT_FLAVOR, label: '' };
+
+  // Thème connu par identifiant.
+  if (THEME_FLAVOR[theme]) {
+    return { ...THEME_FLAVOR[theme], label: findLabel(THEMES, theme, theme) };
+  }
+  // Thème connu par libellé (insensible à la casse).
+  const byLabel = THEMES.find(
+    (t) => t.label.toLowerCase() === String(theme).toLowerCase()
+  );
+  if (byLabel && THEME_FLAVOR[byLabel.id]) {
+    return { ...THEME_FLAVOR[byLabel.id], label: byLabel.label };
+  }
+  // Thème libre : on fabrique une flavor générique à partir du texte.
+  const txt = String(theme).trim();
+  return {
+    univers: `de ${txt}`,
+    perso: 'les enfants',
+    lieu: 'la salle',
+    mot: txt,
+    label: txt,
+  };
 }
 
 function fill(text, flavor, themeLabel) {
@@ -28,7 +69,9 @@ function fill(text, flavor, themeLabel) {
     .replaceAll('{perso}', flavor.perso)
     .replaceAll('{lieu}', flavor.lieu)
     .replaceAll('{mot}', flavor.mot)
-    .replaceAll('{theme}', themeLabel || flavor.mot);
+    .replaceAll('{theme}', themeLabel || flavor.mot)
+    .replace(/\s{2,}/g, ' ')
+    .trim();
 }
 
 // Mappe le "type souhaité" du formulaire vers les catégories de la banque.
@@ -50,25 +93,33 @@ function categoriesForWish(wish) {
 }
 
 /**
- * Transforme un modèle en fiche activité concrète selon le thème/contraintes.
+ * Transforme un modèle en fiche activité concrète.
+ * @param template modèle de la banque
+ * @param opts { flavor, themeLabel, themed, ageRange, location, childrenCount, duration }
  */
-function buildIdea(template, ctx) {
-  const { themeId, themeLabel, ageRange, location, childrenCount, duration } = ctx;
-  const flavor = getFlavor(themeId);
+function buildIdea(template, opts) {
+  const {
+    flavor,
+    themeLabel = '',
+    themed = true,
+    ageRange = '6-11',
+    location = 'interieur',
+    childrenCount = '',
+    duration = '',
+  } = opts;
 
   return {
     id: uid('idea'),
     title: fill(template.title, flavor, themeLabel),
     category: template.category,
     type: template.category,
-    theme: themeId,
-    themeLabel,
+    themed,
+    theme: themed ? themeLabel : '',
+    themeLabel: themed ? themeLabel : '',
     objective: fill(template.objective, flavor, themeLabel),
     objectives: fill(template.objective, flavor, themeLabel),
     duration: duration || template.minDuration,
     ageRange: ageRange || '6-11',
-    recommendedAges:
-      template.ages && template.ages.includes(ageRange) ? ageRange : '6-11',
     childrenCount: childrenCount || '',
     materials: [...template.materials],
     preparation: 'Préparer le matériel et l’espace avant l’arrivée des enfants.',
@@ -82,11 +133,21 @@ function buildIdea(template, ctx) {
   };
 }
 
+// Choisit aléatoirement un modèle dans la 1re catégorie non vide, hors exclusions.
+function pickTemplate(categories, exclude = []) {
+  for (const cat of categories) {
+    const candidates = ACTIVITY_TEMPLATES.filter(
+      (t) => t.category === cat && !exclude.includes(t.title)
+    );
+    if (candidates.length) {
+      return candidates[Math.floor(Math.random() * candidates.length)];
+    }
+  }
+  return null;
+}
+
 /**
- * Filtre les modèles selon les contraintes puis construit les idées,
- * regroupées par catégorie.
- *
- * @returns {Promise<{categories: Array<{id, label, emoji, ideas: []}>, flat: []}>}
+ * Générateur d'idées (page Générateur). Le thème (libre) est appliqué.
  */
 export async function generateIdeas(params = {}) {
   const {
@@ -98,108 +159,118 @@ export async function generateIdeas(params = {}) {
     duration = '',
   } = params;
 
-  const themeLabel = findLabel(THEMES, theme, theme || 'Sans thème');
+  const flavor = resolveFlavor(theme);
+  const themeLabel = flavor.label;
   const wantedCategories = categoriesForWish(wishedType);
-
-  const ctx = {
-    themeId: theme,
+  const buildOpts = {
+    flavor,
     themeLabel,
+    themed: !!theme,
     ageRange,
     location,
     childrenCount,
     duration: duration ? Number(duration) : '',
   };
 
-  const ideas = ACTIVITY_TEMPLATES.filter((t) => {
+  const matching = ACTIVITY_TEMPLATES.filter((t) => {
     if (wantedCategories && !wantedCategories.includes(t.category)) return false;
     if (ageRange && ageRange !== '6-11' && !t.ages.includes(ageRange)) return false;
     if (location && !t.locations.includes(location)) return false;
     if (duration && t.minDuration > Number(duration) + 30) return false;
     return true;
-  }).map((t) => buildIdea(t, ctx));
+  });
 
-  // Repli : si les filtres sont trop stricts, on relâche le lieu/âge.
-  const finalIdeas =
-    ideas.length > 0
-      ? ideas
+  const source =
+    matching.length > 0
+      ? matching
       : ACTIVITY_TEMPLATES.filter(
           (t) => !wantedCategories || wantedCategories.includes(t.category)
-        ).map((t) => buildIdea(t, ctx));
+        );
+
+  const finalIdeas = source.map((t) => buildIdea(t, buildOpts));
 
   const categories = CATEGORIES.map((cat) => ({
     ...cat,
     ideas: finalIdeas.filter((i) => i.category === cat.id),
   })).filter((cat) => cat.ideas.length > 0);
 
-  // Simule une légère latence "IA" pour une transition fluide à l'écran.
-  await new Promise((r) => setTimeout(r, 250));
-
+  await delay(250);
   return { categories, flat: finalIdeas };
 }
 
+// Préférences de catégorie du MATIN selon la phase (jour de semaine).
+const MORNING_BY_INDEX = {
+  0: ['artistique', 'temps_calme'], // lundi – découverte
+  1: ['artistique', 'autonome'], // mardi – création
+  2: ['grand_jeu', 'sport'], // mercredi – défis / coopération
+  3: ['artistique', 'autonome'], // jeudi – préparation
+  4: ['grand_jeu', 'artistique'], // vendredi – restitution
+};
+
+function slotFrom(idea) {
+  if (!idea) return null;
+  return {
+    title: idea.title,
+    materials: idea.materials,
+    notes: '',
+    themed: idea.themed,
+  };
+}
+
 /**
- * Génère une semaine complète (lundi -> vendredi) suivant une progression
- * pédagogique, à partir d'un thème.
+ * Remplit les créneaux d'une liste de jours pour un thème donné.
+ * ⚠️ Le thème n'est appliqué QU'À l'activité du matin. Les autres créneaux
+ * sont générés en neutre (sans thème).
+ *
+ * @param days  jours issus du calendrier (avec weekdayIndex, phase…)
+ * @param theme texte libre du thème de la semaine
+ * @returns jours enrichis d'un objet `slots`
  */
-export async function generateWeek({ theme = '', ageRange = '6-11' } = {}) {
-  const themeLabel = findLabel(THEMES, theme, theme || 'Sans thème');
-  const flavor = getFlavor(theme);
-  const ctx = { themeId: theme, themeLabel, ageRange, location: 'interieur', duration: '' };
+export async function generateWeekDays(days = [], theme = '') {
+  const flavor = resolveFlavor(theme);
+  const themeLabel = flavor.label;
 
-  // Préférences de catégorie par jour, alignées sur la progression.
-  const dayCategoryPref = {
-    lundi: ['artistique', 'temps_calme'],
-    mardi: ['artistique', 'autonome'],
-    mercredi: ['grand_jeu', 'sport'],
-    jeudi: ['artistique', 'autonome'],
-    vendredi: ['grand_jeu', 'artistique'],
-  };
+  const themedOpts = { flavor, themeLabel, themed: true };
+  const neutralOpts = { flavor: NEUTRAL_FLAVOR, themeLabel: '', themed: false };
 
-  const pick = (categories, exclude = []) => {
-    for (const cat of categories) {
-      const candidates = ACTIVITY_TEMPLATES.filter(
-        (t) => t.category === cat && !exclude.includes(t.title)
-      );
-      if (candidates.length) {
-        const t = candidates[Math.floor(Math.random() * candidates.length)];
-        return buildIdea(t, ctx);
-      }
-    }
-    return null;
-  };
-
-  const days = WEEK_DAYS.map((day) => {
-    const prefs = dayCategoryPref[day.id];
+  const result = days.map((day) => {
+    const idx = day.weekdayIndex ?? 0;
     const used = [];
-    const matin = pick(prefs, used);
+
+    const matinT = pickTemplate(MORNING_BY_INDEX[idx] || ['artistique'], used);
+    const matin = matinT ? buildIdea(matinT, themedOpts) : null;
     if (matin) used.push(matin.title);
-    const aprem = pick([prefs[1] || prefs[0], ...prefs], used);
+
+    const apremT = pickTemplate(['sport', 'grand_jeu', 'autonome', 'artistique'], used);
+    const aprem = apremT ? buildIdea(apremT, neutralOpts) : null;
     if (aprem) used.push(aprem.title);
-    const calme = pick(['temps_calme', 'autonome'], used);
-    const libre = pick(['autonome', 'artistique'], used);
+
+    const calmeT = pickTemplate(['temps_calme', 'autonome'], used);
+    const calme = calmeT ? buildIdea(calmeT, neutralOpts) : null;
+    if (calme) used.push(calme.title);
+
+    const libreT = pickTemplate(['autonome', 'artistique'], used);
+    const libre = libreT ? buildIdea(libreT, neutralOpts) : null;
 
     return {
-      id: day.id,
-      label: day.label,
-      phase: day.phase,
+      ...day,
       slots: {
-        temps_libre: libre ? { title: libre.title, materials: libre.materials, notes: '' } : null,
-        activite_matin: matin
-          ? { title: matin.title, materials: matin.materials, notes: fill('Objectif : {mot}', flavor, themeLabel) }
-          : null,
-        temps_calme: calme ? { title: calme.title, materials: calme.materials, notes: '' } : null,
-        activite_aprem: aprem ? { title: aprem.title, materials: aprem.materials, notes: '' } : null,
+        temps_libre: slotFrom(libre),
+        activite_matin: slotFrom(matin),
+        temps_calme: slotFrom(calme),
+        activite_aprem: slotFrom(aprem),
       },
     };
   });
 
-  await new Promise((r) => setTimeout(r, 300));
-
-  return { theme, themeLabel, ageRange, days };
+  await delay(200);
+  return result;
 }
 
 /**
- * Génère la trame d'un projet pédagogique complet.
+ * Génère la trame d'un projet pédagogique complet (thème libre).
+ * Là encore, le thème porte sur les temps forts du MATIN ; les après-midis
+ * restent en activités libres.
  */
 export async function generateProject(params = {}) {
   const {
@@ -213,9 +284,8 @@ export async function generateProject(params = {}) {
     finality = 'spectacle',
   } = params;
 
-  const themeLabel = findLabel(THEMES, theme, theme || 'Sans thème');
-  const flavor = getFlavor(theme);
-  const t = findTheme(theme);
+  const flavor = resolveFlavor(theme);
+  const themeLabel = flavor.label || 'Sans thème';
 
   const durationLabel =
     { jour: 'une journée', semaine: 'une semaine', vacances: 'deux semaines de vacances' }[
@@ -232,49 +302,64 @@ export async function generateProject(params = {}) {
 
   const summary = `Projet "${name || 'Sans titre'}" autour ${flavor.univers}, pensé pour ${
     audience || 'des enfants de 6 à 11 ans'
-  } sur ${durationLabel}. Les enfants deviennent ${flavor.perso} et progressent étape par étape jusqu'à ${finalityLabel}.`;
+  } sur ${durationLabel}. Les temps forts du matin sont rythmés par le thème ; les après-midis restent consacrés à des activités libres. Objectif final : ${finalityLabel}.`;
 
   const baseObjectives = objectives
     ? objectives.split('\n').filter(Boolean)
     : [
         'Favoriser la coopération et le vivre-ensemble.',
         'Développer la créativité et l’expression personnelle.',
-        'Découvrir le thème de façon active et ludique.',
+        'Découvrir le thème de façon active et ludique (le matin).',
         'Valoriser chaque enfant à travers une finalité commune.',
       ];
 
-  // Planning suggéré aligné sur la progression de la semaine.
-  const planning = WEEK_DAYS.map((d) => ({
-    day: d.label,
-    phase: d.phase,
-    focus: fill(
-      {
-        lundi: 'Lancement immersif {univers} : décor, présentation, jeu de découverte.',
-        mardi: 'Ateliers de création et d’apprentissage liés à la finalité.',
-        mercredi: 'Grand jeu coopératif pour souder le groupe.',
-        jeudi: 'Répétitions et finalisation des productions.',
-        vendredi: `Jour J : ${finalityLabel}.`,
-      }[d.id],
-      flavor,
-      themeLabel
-    ),
+  const PHASE_FOCUS = {
+    0: 'Lancement immersif {univers} : décor, présentation, jeu de découverte.',
+    1: 'Ateliers de création et d’apprentissage liés à la finalité.',
+    2: 'Grand jeu coopératif pour souder le groupe.',
+    3: 'Répétitions et finalisation des productions.',
+    4: `Jour J : ${finalityLabel}.`,
+  };
+
+  const planning = [0, 1, 2, 3, 4].map((idx) => ({
+    day: ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'][idx],
+    phase: [
+      'Découverte du thème',
+      'Création / apprentissage',
+      'Défis / coopération',
+      'Préparation finale',
+      'Restitution / spectacle',
+    ][idx],
+    focus: fill(PHASE_FOCUS[idx], flavor, themeLabel),
+    afternoon: 'Après-midi : activités libres (hors thème).',
   }));
 
-  // Quelques idées d'activités tirées de la banque pour ce thème.
-  const { flat } = await generateIdeas({ theme, ageRange: '6-11', location: 'interieur' });
-  const ideaSuggestions = flat.slice(0, 6).map((i) => ({
+  // Idées : matin thématisé, et quelques idées d'après-midi neutres.
+  const themedOpts = { flavor, themeLabel, themed: true };
+  const neutralOpts = { flavor: NEUTRAL_FLAVOR, themeLabel: '', themed: false };
+  const morningIdeas = ['artistique', 'grand_jeu', 'temps_calme']
+    .map((cat) => pickTemplate([cat]))
+    .filter(Boolean)
+    .map((t) => ({ ...buildIdea(t, themedOpts), moment: 'Matin (thème)' }));
+  const afternoonIdeas = ['sport', 'autonome', 'grand_jeu']
+    .map((cat) => pickTemplate([cat]))
+    .filter(Boolean)
+    .map((t) => ({ ...buildIdea(t, neutralOpts), moment: 'Après-midi (libre)' }));
+
+  const ideaSuggestions = [...morningIdeas, ...afternoonIdeas].map((i) => ({
     title: i.title,
     category: i.category,
     duration: i.duration,
+    moment: i.moment,
   }));
 
-  await new Promise((r) => setTimeout(r, 300));
+  await delay(300);
 
   return {
     name,
     theme,
     themeLabel,
-    themeColor: t ? t.color : '#7C3AED',
+    themeColor: '#7C3AED',
     duration,
     durationLabel,
     audience,
