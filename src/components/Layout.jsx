@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -57,6 +57,14 @@ function Brand() {
 export default function Layout({ children }) {
   const [open, setOpen] = useState(false);
 
+  // Bloque le défilement de l'arrière-plan quand le volet est ouvert.
+  useEffect(() => {
+    document.body.style.overflow = open ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [open]);
+
   return (
     <div className="min-h-screen bg-surface">
       {/* Sidebar bureau */}
@@ -82,25 +90,37 @@ export default function Layout({ children }) {
         </button>
       </header>
 
-      {/* Drawer mobile */}
-      {open && (
-        <div className="no-print fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-ink/40" onClick={() => setOpen(false)} />
-          <div className="absolute inset-y-0 left-0 w-72 bg-white px-4 py-5 shadow-xl">
-            <div className="flex items-center justify-between">
-              <Brand />
-              <button onClick={() => setOpen(false)} className="btn-ghost !p-2" aria-label="Fermer">
-                <X size={20} />
-              </button>
-            </div>
-            <nav className="mt-8 flex flex-col gap-1.5">
-              {NAV.map((item) => (
-                <NavItem key={item.to} item={item} onClick={() => setOpen(false)} />
-              ))}
-            </nav>
+      {/* Volet (drawer) : glisse de la droite vers la gauche, 80% de l'écran */}
+      <div className="no-print lg:hidden" role="dialog" aria-modal="true" aria-hidden={!open}>
+        {/* Fond semi-transparent */}
+        <div
+          className={`fixed inset-0 z-50 bg-ink/40 transition-opacity duration-300 ${
+            open ? 'opacity-100' : 'pointer-events-none opacity-0'
+          }`}
+          onClick={() => setOpen(false)}
+        />
+        {/* Panneau coulissant */}
+        <div
+          className={`fixed inset-y-0 right-0 z-50 flex w-4/5 flex-col bg-white px-4 py-5 shadow-2xl transition-transform duration-300 ease-out ${
+            open ? 'translate-x-0' : 'translate-x-full'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <Brand />
+            <button onClick={() => setOpen(false)} className="btn-ghost !p-2" aria-label="Fermer">
+              <X size={20} />
+            </button>
+          </div>
+          <nav className="mt-8 flex flex-col gap-1.5">
+            {NAV.map((item) => (
+              <NavItem key={item.to} item={item} onClick={() => setOpen(false)} />
+            ))}
+          </nav>
+          <div className="mt-auto rounded-xl bg-primary-50 p-3 text-xs text-primary-700">
+            💡 Astuce : sauvegardez vos meilleures activités pour les retrouver dans la bibliothèque.
           </div>
         </div>
-      )}
+      </div>
 
       {/* Contenu */}
       <main className="lg:pl-64">
