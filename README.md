@@ -19,9 +19,11 @@ meilleures animations.
   catégories (artistiques, sportives, grands jeux, temps calmes, autonomes).
 - **Planning journée** : créneaux fixes ALSH, ajout/modification/suppression
   d'activités, matériel, notes, export & impression.
-- **Planning semaine** : lundi → vendredi avec progression pédagogique
-  (découverte → création → coopération → préparation → restitution), génération
-  automatique à partir d'un thème.
+- **Planning juillet 2026** (vue mois) : toutes les semaines du mois (semaine
+  partielle du 1er incluse) avec dates réelles et progression pédagogique. **Un
+  thème saisi librement par semaine** (c'est l'équipe qui le choisit) ; le thème
+  ne s'applique **qu'aux activités du matin**, les après-midis restant en
+  activités libres. Génération par semaine ou pour tout le mois.
 - **Bibliothèque** : activités sauvegardées, filtres (thème, âge, type, durée,
   lieu, difficulté), modification et suppression.
 - **Fiche activité** complète et éditable (objectifs, matériel, déroulement,

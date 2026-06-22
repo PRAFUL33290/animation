@@ -20,9 +20,9 @@ const ACTIONS = [
     color: '#2563EB',
   },
   {
-    to: '/semaine',
-    title: 'Créer une semaine',
-    desc: 'Générer une semaine à thème avec une progression pédagogique.',
+    to: '/mois',
+    title: 'Planning juillet 2026',
+    desc: 'Préparer le mois : un thème par semaine (le matin), progression pédagogique.',
     icon: CalendarRange,
     color: '#22C55E',
   },
@@ -66,8 +66,8 @@ export default function Dashboard() {
           <Link to="/generateur" className="btn bg-white text-primary-700 hover:bg-white/90">
             <Sparkles size={16} /> Générer des idées
           </Link>
-          <Link to="/semaine" className="btn bg-white/15 text-white ring-1 ring-white/40 hover:bg-white/25">
-            <CalendarRange size={16} /> Préparer une semaine
+          <Link to="/mois" className="btn bg-white/15 text-white ring-1 ring-white/40 hover:bg-white/25">
+            <CalendarRange size={16} /> Préparer juillet 2026
           </Link>
         </div>
       </div>
@@ -77,7 +77,7 @@ export default function Dashboard() {
       <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard icon={BookMarked} label="Activités sauvegardées" value={activities.length} color="#7C3AED" />
         <StatCard icon={FolderKanban} label="Projets créés" value={projects.length} color="#EC4899" />
-        <StatCard icon={CalendarRange} label="Semaines préparées" value={weeks.length} color="#22C55E" />
+        <StatCard icon={CalendarRange} label="Plannings préparés" value={weeks.length} color="#22C55E" />
         <StatCard icon={CalendarDays} label="Journées préparées" value={days.length} color="#2563EB" />
       </div>
 

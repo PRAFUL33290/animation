@@ -120,6 +120,32 @@ export function weekToText(week) {
   return lines.join('\n');
 }
 
+export function monthToText(plan) {
+  const lines = [];
+  lines.push(`PLANNING ${(plan.label || 'MOIS').toUpperCase()}`);
+  lines.push(line('═'));
+  lines.push('Rappel : le thème porte uniquement sur les activités du matin.');
+  lines.push('');
+  (plan.weeks || []).forEach((week) => {
+    lines.push(`■ ${week.label.toUpperCase()} (${week.rangeLabel})${week.theme ? ' — Thème : ' + week.theme : ''}`);
+    (week.days || []).forEach((day) => {
+      lines.push(`  • ${day.weekday} ${day.day} — ${day.phase}`);
+      WEEK_SLOTS.forEach((slot) => {
+        const entry = day.slots && day.slots[slot.id];
+        const title = entry && entry.title ? entry.title : '—';
+        const tag = slot.id === 'activite_matin' ? ' [thème]' : '';
+        lines.push(`      ${slot.time} ${slot.label}${tag} : ${title}`);
+        if (entry && entry.materials && entry.materials.length) {
+          const mats = Array.isArray(entry.materials) ? entry.materials.join(', ') : entry.materials;
+          lines.push(`           Matériel : ${mats}`);
+        }
+      });
+    });
+    lines.push('');
+  });
+  return lines.join('\n');
+}
+
 export function projectToText(p) {
   const lines = [];
   lines.push(`PROJET PÉDAGOGIQUE : ${p.name || 'Sans titre'}`);

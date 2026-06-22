@@ -21,7 +21,7 @@ import { downloadText, projectToText, printPage } from '../utils/export.js';
 
 const DEFAULTS = {
   name: '',
-  theme: 'harry_potter',
+  theme: '',
   duration: 'semaine',
   audience: '6-11 ans',
   objectives: '',
@@ -91,13 +91,19 @@ export default function ProjectGenerator() {
             <input className="input" placeholder="Ex : Une semaine à Poudlard" value={form.name} onChange={(e) => update('name', e.target.value)} />
           </div>
           <div>
-            <label className="label">Thème</label>
-            <select className="input" value={form.theme} onChange={(e) => update('theme', e.target.value)}>
-              <option value="">— Sans thème —</option>
+            <label className="label">Thème (saisie libre)</label>
+            <input
+              className="input"
+              list="project-theme-suggestions"
+              placeholder="Ex : Une semaine de pirates…"
+              value={form.theme}
+              onChange={(e) => update('theme', e.target.value)}
+            />
+            <datalist id="project-theme-suggestions">
               {THEMES.map((t) => (
-                <option key={t.id} value={t.id}>{t.emoji} {t.label}</option>
+                <option key={t.id} value={t.label}>{t.emoji} {t.label}</option>
               ))}
-            </select>
+            </datalist>
           </div>
           <div>
             <label className="label">Durée</label>
@@ -182,6 +188,9 @@ export default function ProjectGenerator() {
                     {d.day} <span className="font-semibold text-primary">· {d.phase}</span>
                   </div>
                   <div className="text-sm text-slate-600">{d.focus}</div>
+                  {d.afternoon && (
+                    <div className="mt-0.5 text-xs italic text-slate-400">{d.afternoon}</div>
+                  )}
                 </div>
               ))}
             </div>
@@ -190,9 +199,22 @@ export default function ProjectGenerator() {
           <Block icon={Lightbulb} title="Idées d'activités">
             <div className="grid gap-2 sm:grid-cols-2">
               {result.ideaSuggestions.map((idea, i) => (
-                <div key={i} className="flex items-center justify-between rounded-xl bg-surface p-3 text-sm">
-                  <span className="font-medium text-ink">{idea.title}</span>
-                  <span className="text-xs text-slate-400">{idea.duration} min</span>
+                <div key={i} className="flex items-center justify-between gap-2 rounded-xl bg-surface p-3 text-sm">
+                  <div className="min-w-0">
+                    <span className="font-medium text-ink">{idea.title}</span>
+                    {idea.moment && (
+                      <span
+                        className={`ml-2 chip ${
+                          idea.moment.startsWith('Matin')
+                            ? 'bg-primary-100 text-primary-700'
+                            : 'bg-slate-100 text-slate-500'
+                        }`}
+                      >
+                        {idea.moment}
+                      </span>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-xs text-slate-400">{idea.duration} min</span>
                 </div>
               ))}
             </div>

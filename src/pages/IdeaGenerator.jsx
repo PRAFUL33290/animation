@@ -18,7 +18,7 @@ import {
 } from '../data/themes.js';
 
 const DEFAULTS = {
-  theme: 'oceans',
+  theme: '',
   ageRange: '6-11',
   childrenCount: '24',
   animators: '3',
@@ -71,15 +71,21 @@ export default function IdeaGenerator() {
       <form onSubmit={onGenerate} className="card mb-8">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div>
-            <label className="label">Thème</label>
-            <select className="input" value={form.theme} onChange={(e) => update('theme', e.target.value)}>
-              <option value="">— Sans thème —</option>
+            <label className="label">Thème (saisie libre)</label>
+            <input
+              className="input"
+              list="idea-theme-suggestions"
+              placeholder="Ex : Pirates, Océans, Cirque…"
+              value={form.theme}
+              onChange={(e) => update('theme', e.target.value)}
+            />
+            <datalist id="idea-theme-suggestions">
               {THEMES.map((t) => (
-                <option key={t.id} value={t.id}>
+                <option key={t.id} value={t.label}>
                   {t.emoji} {t.label}
                 </option>
               ))}
-            </select>
+            </datalist>
           </div>
 
           <div>
