@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, Wand2, Loader2 } from 'lucide-react';
+import { Sparkles, Wand2, Loader2, SlidersHorizontal } from 'lucide-react';
 import PageHeader from '../components/PageHeader.jsx';
 import ActivityCard from '../components/ActivityCard.jsx';
 import ActivityDetail from '../components/ActivityDetail.jsx';
@@ -35,6 +35,7 @@ export default function IdeaGenerator() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [savedIds, setSavedIds] = useState(new Set());
 
   const update = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -64,14 +65,19 @@ export default function IdeaGenerator() {
     <div>
       <PageHeader
         title="Générateur d'idées"
-        subtitle="Renseignez votre contexte, l'assistant vous propose des activités classées."
+        subtitle="Une page plus simple : 3 critères suffisent, puis l'assistant vérifie la pertinence des activités."
         icon={Sparkles}
       />
 
-      <form onSubmit={onGenerate} className="card mb-8">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <form onSubmit={onGenerate} className="card mb-8 space-y-5">
+        <div className="rounded-2xl bg-primary-50 p-4 text-sm text-primary-800">
+          <p className="font-bold">Mode simple</p>
+          <p>Choisissez seulement le thème, l’âge et le lieu. Les autres réglages restent disponibles si besoin.</p>
+        </div>
+
+        <div className="grid gap-4 lg:grid-cols-3">
           <div>
-            <label className="label">Thème (saisie libre)</label>
+            <label className="label">1. Thème</label>
             <input
               className="input"
               list="idea-theme-suggestions"
@@ -89,104 +95,107 @@ export default function IdeaGenerator() {
           </div>
 
           <div>
-            <label className="label">Tranche d'âge</label>
+            <label className="label">2. Âge</label>
             <select className="input" value={form.ageRange} onChange={(e) => update('ageRange', e.target.value)}>
               {AGE_RANGES.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.label}
-                </option>
+                <option key={a.id} value={a.id}>{a.label}</option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="label">Type d'activité souhaité</label>
-            <select className="input" value={form.wishedType} onChange={(e) => update('wishedType', e.target.value)}>
-              <option value="">Tous les types</option>
-              {WISHED_TYPES.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="label">Nombre d'enfants</label>
-            <input
-              type="number"
-              min="1"
-              className="input"
-              value={form.childrenCount}
-              onChange={(e) => update('childrenCount', e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label className="label">Nombre d'animateurs</label>
-            <input
-              type="number"
-              min="1"
-              className="input"
-              value={form.animators}
-              onChange={(e) => update('animators', e.target.value)}
-            />
-          </div>
-
-          <div>
-            <label className="label">Durée</label>
-            <select className="input" value={form.duration} onChange={(e) => update('duration', e.target.value)}>
-              <option value="">Indifférente</option>
-              {DURATIONS.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="label">Lieu</label>
+            <label className="label">3. Lieu</label>
             <select className="input" value={form.location} onChange={(e) => update('location', e.target.value)}>
               {LOCATIONS.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="label">Météo</label>
-            <select className="input" value={form.weather} onChange={(e) => update('weather', e.target.value)}>
-              {WEATHER.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.emoji} {w.label}
-                </option>
+                <option key={l.id} value={l.id}>{l.label}</option>
               ))}
             </select>
           </div>
         </div>
 
-        <div className="mt-5 flex justify-end">
+        <button
+          type="button"
+          className="btn-ghost text-slate-600"
+          onClick={() => setShowAdvanced((v) => !v)}
+        >
+          <SlidersHorizontal size={16} /> {showAdvanced ? 'Masquer les options' : 'Options avancées'}
+        </button>
+
+        {showAdvanced && (
+          <div className="grid gap-4 rounded-2xl border border-slate-100 bg-slate-50 p-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div>
+              <label className="label">Type souhaité</label>
+              <select className="input" value={form.wishedType} onChange={(e) => update('wishedType', e.target.value)}>
+                <option value="">Tous les types</option>
+                {WISHED_TYPES.map((w) => <option key={w.id} value={w.id}>{w.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">Enfants</label>
+              <input type="number" min="1" className="input" value={form.childrenCount} onChange={(e) => update('childrenCount', e.target.value)} />
+            </div>
+            <div>
+              <label className="label">Animateurs</label>
+              <input type="number" min="1" className="input" value={form.animators} onChange={(e) => update('animators', e.target.value)} />
+            </div>
+            <div>
+              <label className="label">Durée</label>
+              <select className="input" value={form.duration} onChange={(e) => update('duration', e.target.value)}>
+                <option value="">Indifférente</option>
+                {DURATIONS.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">Météo</label>
+              <select className="input" value={form.weather} onChange={(e) => update('weather', e.target.value)}>
+                {WEATHER.map((w) => <option key={w.id} value={w.id}>{w.emoji} {w.label}</option>)}
+              </select>
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-end">
           <button type="submit" className="btn-primary" disabled={loading}>
             {loading ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
-            {loading ? 'Génération…' : 'Générer des idées'}
+            {loading ? 'Vérification…' : 'Voir les activités pertinentes'}
           </button>
         </div>
       </form>
 
       {result && (
         <div className="space-y-8">
+          {result.recommended?.length > 0 && (
+            <section>
+              <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-ink">
+                <span className="text-xl">✅</span> Activités les plus pertinentes
+              </h2>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {result.recommended.map((idea) => (
+                  <ActivityCard
+                    key={idea.id}
+                    activity={idea}
+                    onView={setPreview}
+                    onAddToPlanning={handleAddToPlanning}
+                    onSave={handleSave}
+                    saved={isSaved(idea)}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
+
           {result.categories.length === 0 && (
             <p className="text-center text-slate-500">
               Aucune idée ne correspond à ces critères. Essayez d'élargir le lieu ou l'âge.
             </p>
           )}
+          <details className="card">
+            <summary className="cursor-pointer font-bold text-ink">Voir toutes les idées par catégorie</summary>
+            <div className="mt-5 space-y-8">
           {result.categories.map((cat) => (
             <section key={cat.id}>
               <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-ink">
-                <span className="text-xl">{cat.emoji}</span> {cat.label}
+                <span className="text-xl">{cat.emoji}</span> Toutes les idées — {cat.label}
                 <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-500">
                   {cat.ideas.length}
                 </span>
@@ -205,6 +214,8 @@ export default function IdeaGenerator() {
               </div>
             </section>
           ))}
+            </div>
+          </details>
         </div>
       )}
 
