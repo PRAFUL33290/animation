@@ -1,4 +1,4 @@
-import { Clock, Users, MapPin, CalendarPlus, BookmarkPlus, Eye, Check } from 'lucide-react';
+import { Clock, Users, MapPin, CalendarPlus, BookmarkPlus, Eye, Check, ShieldCheck } from 'lucide-react';
 import Badge, { DifficultyBadge } from './Badge.jsx';
 import { ACTIVITY_TYPES, findLabel, LOCATIONS } from '../data/themes.js';
 
@@ -48,7 +48,23 @@ export default function ActivityCard({
       <div className="mb-3 flex flex-wrap gap-1.5">
         {type && <Badge tone="primary">{type.label}</Badge>}
         <DifficultyBadge value={activity.difficulty} />
+        {activity.relevance?.label && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-1 text-xs font-bold text-green-700">
+            <ShieldCheck size={13} /> {activity.relevance.label}
+          </span>
+        )}
       </div>
+
+      {!compact && activity.relevance?.points?.length > 0 && (
+        <ul className="mb-3 space-y-1 text-xs text-slate-500">
+          {activity.relevance.points.map((point) => (
+            <li key={point} className="flex gap-1.5">
+              <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-green-400" />
+              <span>{point}</span>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {!compact && activity.materials?.length > 0 && (
         <div className="mb-3 text-xs text-slate-500">

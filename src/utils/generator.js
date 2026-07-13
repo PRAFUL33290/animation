@@ -95,7 +95,7 @@ function categoriesForWish(wish) {
 /**
  * Transforme un modèle en fiche activité concrète.
  * @param template modèle de la banque
- * @param opts { flavor, themeLabel, themed, ageRange, location, childrenCount, duration }
+ * @param opts { flavor, themeLabel, themed, ageRange, location, childrenCount, duration, animators, weather, wishedType }
  */
 function buildIdea(template, opts) {
   const {
@@ -106,7 +106,12 @@ function buildIdea(template, opts) {
     location = 'interieur',
     childrenCount = '',
     duration = '',
+    animators = '',
+    weather = 'ensoleille',
+    wishedType = '',
   } = opts;
+
+  const relevance = evaluateRelevance(template, { ageRange, location, childrenCount, duration, animators, weather, wishedType });
 
   return {
     id: uid('idea'),
@@ -127,10 +132,65 @@ function buildIdea(template, opts) {
     variant: fill(template.variant, flavor, themeLabel),
     difficulty: template.difficulty,
     location: template.locations.includes(location) ? location : template.locations[0],
+    relevance,
     safety: 'Rappeler les règles de sécurité et compter les enfants régulièrement.',
     feedback: '',
     note: '',
   };
+}
+
+
+function evaluateRelevance(template, opts) {
+  const { ageRange, location, childrenCount, duration, animators, weather, wishedType } = opts;
+  const points = [];
+  let score = 100;
+
+  if (ageRange && template.ages.includes(ageRange)) points.push(`Adapté aux ${ageRange} ans`);
+  else if (ageRange && ageRange !== '6-11') {
+    score -= 18;
+    points.push('À ajuster pour cette tranche d’âge');
+  }
+
+  if (location && template.locations.includes(location)) points.push(location === 'exterieur' ? 'Prévu dehors' : 'Prévu en intérieur');
+  else if (location) {
+    score -= 25;
+    points.push('Lieu à adapter');
+  }
+
+  if (duration) {
+    const delta = Number(duration) - template.minDuration;
+    if (delta >= 0 && delta <= 30) points.push('Durée cohérente');
+    else if (delta < 0) {
+      score -= 20;
+      points.push('Prévoir une version plus courte');
+    } else points.push('Peut être enrichi si vous avez du temps');
+  }
+
+  const count = Number(childrenCount || 0);
+  const staff = Number(animators || 0);
+  if (count && staff) {
+    const ratio = count / staff;
+    if (template.category === 'grand_jeu' && ratio > 10) {
+      score -= 12;
+      points.push('Grand jeu : prévoir des équipes très cadrées');
+    } else if (template.category === 'sport' && ratio > 12) {
+      score -= 10;
+      points.push('Sport : sécuriser les rotations');
+    } else points.push('Encadrement cohérent');
+  }
+
+  if (['pluvieux', 'froid'].includes(weather) && template.locations.length === 1 && template.locations[0] === 'exterieur') {
+    score -= 30;
+    points.push('Météo défavorable : prévoir un plan B intérieur');
+  } else if (weather === 'chaud' && ['sport', 'grand_jeu'].includes(template.category)) {
+    score -= 12;
+    points.push('Forte chaleur : pauses eau et zones d’ombre');
+  } else if (weather) points.push('Compatible avec la météo');
+
+  if (wishedType && wishedType !== 'libre' && template.category === wishedType) points.push('Correspond au type demandé');
+
+  const label = score >= 85 ? 'Très pertinent' : score >= 70 ? 'Pertinent' : 'À adapter';
+  return { score: Math.max(45, Math.min(100, score)), label, points: points.slice(0, 3) };
 }
 
 // Choisit aléatoirement un modèle dans la 1re catégorie non vide, hors exclusions.
@@ -154,7 +214,9 @@ export async function generateIdeas(params = {}) {
     theme = '',
     ageRange = '6-11',
     childrenCount = '',
+    animators = '',
     location = 'interieur',
+    weather = 'ensoleille',
     wishedType = '',
     duration = '',
   } = params;
@@ -169,6 +231,9 @@ export async function generateIdeas(params = {}) {
     ageRange,
     location,
     childrenCount,
+    animators,
+    weather,
+    wishedType,
     duration: duration ? Number(duration) : '',
   };
 
@@ -187,7 +252,9 @@ export async function generateIdeas(params = {}) {
           (t) => !wantedCategories || wantedCategories.includes(t.category)
         );
 
-  const finalIdeas = source.map((t) => buildIdea(t, buildOpts));
+  const finalIdeas = source
+    .map((t) => buildIdea(t, buildOpts))
+    .sort((a, b) => (b.relevance?.score || 0) - (a.relevance?.score || 0));
 
   const categories = CATEGORIES.map((cat) => ({
     ...cat,
@@ -195,7 +262,7 @@ export async function generateIdeas(params = {}) {
   })).filter((cat) => cat.ideas.length > 0);
 
   await delay(250);
-  return { categories, flat: finalIdeas };
+  return { categories, flat: finalIdeas, recommended: finalIdeas.slice(0, 6) };
 }
 
 // Préférences de catégorie du MATIN selon la phase (jour de semaine).
